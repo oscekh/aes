@@ -36,45 +36,48 @@ std::string bytes_to_hexstr(char *data, int len) {
   return s;
 }
 
-void lrotate(char arr[4][4], int steps) {
+void shift_row(unsigned char state[4][4], int row, int steps) {
     if (steps % 4 == 0) {
         return;
     }
 
-    //for (int i = 0; i < 4; ++i) {
-    //    ret[i] = arr[(i + steps) % 4];
-    //}
+    for (int i = 0; i < steps; ++i) {
+        unsigned char first = state[row][0];
+        for (int j = 0; j < 3; ++j) {
+            state[row][j] = state[row][j + 1];
+        }
+        state[row][3] = first;
+    }
 }
 
-void sub_bytes(char state[4][4]) {
+void sub_bytes(unsigned char state[4][4]) {
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
-            unsigned short entry = state[j][i];
+            unsigned char entry = state[j][i];
             int row = entry / 16;
             int col = entry % 16;
 
-            std::cout << std::hex << entry << ",\tRow:" << row << ",\tCol:" << col<< "\n";
-            //table[i][j] = sbox[row][col];
+            state[i][j] = sbox[row][col];
         }
     }
 }
 
-void shift_rows(char state[4][4]) {
-    lrotate(state, 1);
-    lrotate(state, 2);
-    lrotate(state, 3);
+void shift_rows(unsigned char state[4][4]) {
+    shift_row(state, 1, 1);
+    shift_row(state, 2, 2);
+    shift_row(state, 3, 3);
 }
 
-void mix_columns(char state[4][4]) {
+void mix_columns(unsigned char state[4][4]) {
 
 }
 
-void add_round_key(char state[4][4]) {
+void add_round_key(unsigned char state[4][4]) {
 
 }
 
 char* encrypt(char* block) {
-    char state[4][4];
+    unsigned char state[4][4];
 
     // 0 4  8 12
     // 1 5  9 13
@@ -115,7 +118,6 @@ char* encrypt(char* block) {
 
 int main() {
     char key[16];
-    std::vector<char*> blocks;
     std::cin.read(key, 16);
 
     std::string hex_key = bytes_to_hexstr(key, 16);
