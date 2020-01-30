@@ -1,9 +1,12 @@
+// Most of this is based on the information in following report:
+// https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197.pdf
+
 #include <vector>
 #include <iostream>
 #include <unistd.h>
 
 // 10 in AES-128
-const int ROUNDS = 1;
+const int ROUNDS = 10;
 
 int sbox[16][16] = {
      {0x63 ,0x7c ,0x77 ,0x7b ,0xf2 ,0x6b ,0x6f ,0xc5 ,0x30 ,0x01 ,0x67 ,0x2b ,0xfe ,0xd7 ,0xab ,0x76},
@@ -24,9 +27,12 @@ int sbox[16][16] = {
      {0x8c ,0xa1 ,0x89 ,0x0d ,0xbf ,0xe6 ,0x42 ,0x68 ,0x41 ,0x99 ,0x2d ,0x0f ,0xb0 ,0x54 ,0xbb ,0x16}
 };
 
+int rcon[10] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
+
 constexpr char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
                            '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
+// from: https://codereview.stackexchange.com/a/78539
 std::string bytes_to_hexstr(char *data, int len) {
   std::string s(len * 2, ' ');
   for (int i = 0; i < len; ++i) {
@@ -34,6 +40,18 @@ std::string bytes_to_hexstr(char *data, int len) {
     s[2 * i + 1] = hexmap[data[i] & 0x0F];
   }
   return s;
+}
+
+void sub_bytes(unsigned char state[4][4]) {
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            unsigned char entry = state[j][i];
+            int row = entry / 16;
+            int col = entry % 16;
+
+            state[i][j] = sbox[row][col];
+        }
+    }
 }
 
 void shift_row(unsigned char state[4][4], int row, int steps) {
@@ -50,61 +68,119 @@ void shift_row(unsigned char state[4][4], int row, int steps) {
     }
 }
 
-void sub_bytes(unsigned char state[4][4]) {
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            unsigned char entry = state[j][i];
-            int row = entry / 16;
-            int col = entry % 16;
-
-            state[i][j] = sbox[row][col];
-        }
-    }
-}
-
 void shift_rows(unsigned char state[4][4]) {
     shift_row(state, 1, 1);
     shift_row(state, 2, 2);
     shift_row(state, 3, 3);
 }
 
+// heavily based on: https://en.wikipedia.org/wiki/Rijndael_MixColumns
 void mix_columns(unsigned char state[4][4]) {
+    for (int col = 0; col < 4; ++col) {
+        unsigned char a[4];
+        unsigned char b[4];
+        unsigned char h;
 
+        for (int row = 0; row < 4; ++row) {
+            a[row] = state[row][col];
+
+            h = (unsigned char)((signed char)state[row][col] >> 7);
+            b[row] = state[row][col] << 1;
+            b[row] ^= 0x1B & h;
+        }
+
+        state[0][col] = b[0] ^ a[3] ^ a[2] ^ b[1] ^ a[1];
+        state[1][col] = b[1] ^ a[0] ^ a[3] ^ b[2] ^ a[2];
+        state[2][col] = b[2] ^ a[1] ^ a[0] ^ b[3] ^ a[3];
+        state[3][col] = b[3] ^ a[2] ^ a[1] ^ b[0] ^ a[0];
+    }
 }
 
-void add_round_key(unsigned char state[4][4]) {
-
+void add_round_key(unsigned char state[4][4], unsigned char key[], int start) {
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            state[i][j] = state[i][j] ^ key[start + i + 4*j];
+        }
+    }
 }
 
-char* encrypt(char* block) {
+void rot_word(unsigned char arr[4]) {
+    unsigned char first = arr[0];
+    arr[0] = arr[1];
+    arr[1] = arr[2];
+    arr[2] = arr[3];
+    arr[3] = first;
+}
+
+void sub_word(unsigned char arr[4]) {
+    for (int i = 0; i < 4; ++i) {
+        arr[i] = sbox[arr[i] / 16][arr[i] % 16];
+    }
+}
+
+void key_expansion(char* key, unsigned char w[]) {
+    unsigned char temp[4];
+
+    int i = 0;
+    while (i < 16) {
+        w[i] = key[i];
+        i++;
+    }
+
+    i = 16;
+
+    while (i < 16 * (ROUNDS+1)) {
+        temp[0] = w[i - 4];
+        temp[1] = w[i - 4 + 1];
+        temp[2] = w[i - 4 + 2];
+        temp[3] = w[i - 4 + 3];
+
+        if (i/4 % 4 == 0) {
+            rot_word(temp);
+            sub_word(temp);
+
+            temp[0] = temp[0] ^ rcon[i / 16];
+
+        } else if (i/4 % 4 == 4) {
+            sub_word(temp);
+        }
+
+        w[i]     = w[i - 16] ^ temp[0];
+        w[i + 1] = w[i - 15] ^ temp[1];
+        w[i + 2] = w[i - 14] ^ temp[2];
+        w[i + 3] = w[i - 13] ^ temp[3];
+
+        i += 4;
+    }
+}
+
+char* encrypt(char* block, char* key) {
     unsigned char state[4][4];
 
-    // 0 4  8 12
-    // 1 5  9 13
-    // 2 6 10 14
-    // 3 7 11 15
+    unsigned char w[16 * (ROUNDS+1)];
+    key_expansion(key, w);
 
     // copy block into state matrix
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
             state[i][j] = block[i + 4*j];
-            //std::cout << ">>> " << block[i+j*4] << ;
         }
     }
 
     // initial round key addition
+    add_round_key(state, w, 0);
 
-    for (int i = 0; i < ROUNDS-1; ++i) {
+    for (int round = 0; round < ROUNDS-1; ++round) {
         sub_bytes(state);
         shift_rows(state);
         mix_columns(state);
-        add_round_key(state);
+        add_round_key(state, w, 16 * (round+1));
     }
 
     // last round
     sub_bytes(state);
     shift_rows(state);
-    add_round_key(state);
+    add_round_key(state, w, 16 * ROUNDS);
 
     // copy output to block
     for (int i = 0; i < 4; ++i) {
@@ -129,12 +205,19 @@ int main() {
         std::cin.read(block, 16);
 
         std::string hex_block = bytes_to_hexstr(block, 16);
-        char* encrypted = encrypt(block);
+        char* encrypted = encrypt(block, key);
 
+        /*
         std::cout << "block" << i << ":\t";
-        std::cout << hex_block << "\n";
+        std::cout << hex_block << " " << "\n";
+        std::string hex_encrypted = bytes_to_hexstr(encrypted, 16);
+        std::cout << "encr:\t" <<  hex_encrypted << " " << "\n";
+        */
 
-        break;
+        for (int j = 0; j < 16; ++j) {
+            std::cout << encrypted[j];
+        }
+        //std::cout << "\n";
 
         i++;
     }
