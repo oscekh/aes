@@ -2,6 +2,9 @@
 #include <iostream>
 #include <unistd.h>
 
+// 10 in AES-128
+const int ROUNDS = 1;
+
 int sbox[16][16] = {
      {0x63 ,0x7c ,0x77 ,0x7b ,0xf2 ,0x6b ,0x6f ,0xc5 ,0x30 ,0x01 ,0x67 ,0x2b ,0xfe ,0xd7 ,0xab ,0x76},
      {0xca ,0x82 ,0xc9 ,0x7d ,0xfa ,0x59 ,0x47 ,0xf0 ,0xad ,0xd4 ,0xa2 ,0xaf ,0x9c ,0xa4 ,0x72 ,0xc0},
@@ -33,57 +36,78 @@ std::string bytes_to_hexstr(char *data, int len) {
   return s;
 }
 
-std::vector<unsigned short> lrotate(std::vector<unsigned short> arr, int steps) {
+void lrotate(char arr[4][4], int steps) {
     if (steps % 4 == 0) {
-        return arr;
+        return;
     }
 
-    std::vector<unsigned short> ret(4);
+    //for (int i = 0; i < 4; ++i) {
+    //    ret[i] = arr[(i + steps) % 4];
+    //}
+}
 
+void sub_bytes(char state[4][4]) {
     for (int i = 0; i < 4; ++i) {
-        ret[i] = arr[(i + steps) % 4];
-    }
+        for (int j = 0; j < 4; ++j) {
+            unsigned short entry = state[j][i];
+            int row = entry / 16;
+            int col = entry % 16;
 
-    return ret;
+            std::cout << std::hex << entry << ",\tRow:" << row << ",\tCol:" << col<< "\n";
+            //table[i][j] = sbox[row][col];
+        }
+    }
+}
+
+void shift_rows(char state[4][4]) {
+    lrotate(state, 1);
+    lrotate(state, 2);
+    lrotate(state, 3);
+}
+
+void mix_columns(char state[4][4]) {
+
+}
+
+void add_round_key(char state[4][4]) {
+
 }
 
 char* encrypt(char* block) {
-    int rounds = 1;
-    std::vector<std::vector<unsigned short> > table(4, std::vector<unsigned short>(4));
-
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            table[i][j] = block[i + j*4];
-            std::cout << ">>> " << block[i+j*4] << ;
-        }
-    }
+    char state[4][4];
 
     // 0 4  8 12
     // 1 5  9 13
     // 2 6 10 14
     // 3 7 11 15
 
-    for (int i = 0; i < rounds; ++i) {
-
-        // sub bytes
-        for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
-                unsigned short entry = table[j][i];
-                int row = entry / 16;
-                int col = entry % 16;
-
-                std::cout << std::hex << entry << ",\tR:" << row << ",\tC:" << col<< "\n";
-                //table[i][j] = sbox[row][col];
-            }
+    // copy block into state matrix
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            state[i][j] = block[i + 4*j];
+            //std::cout << ">>> " << block[i+j*4] << ;
         }
+    }
 
-        // shift rows
-        table[1] = lrotate(table[1], 1);
-        table[2] = lrotate(table[2], 2);
-        table[3] = lrotate(table[3], 3);
+    // initial round key addition
 
-        // mix columns
-        // add round key
+    for (int i = 0; i < ROUNDS-1; ++i) {
+        sub_bytes(state);
+        shift_rows(state);
+        mix_columns(state);
+        add_round_key(state);
+    }
+
+    // last round
+    sub_bytes(state);
+    shift_rows(state);
+    add_round_key(state);
+
+    // copy output to block
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            block[i + 4*j] = state[i][j];
+        }
     }
 
     return block;
@@ -104,9 +128,12 @@ int main() {
 
         std::string hex_block = bytes_to_hexstr(block, 16);
         char* encrypted = encrypt(block);
+
         std::cout << "block" << i << ":\t";
         std::cout << hex_block << "\n";
+
         break;
+
         i++;
     }
 
