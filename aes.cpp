@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 // 10 in AES-128
-const int ROUNDS = 10;
+const int ROUNDS = 1;
 
 int sbox[16][16] = {
      {0x63 ,0x7c ,0x77 ,0x7b ,0xf2 ,0x6b ,0x6f ,0xc5 ,0x30 ,0x01 ,0x67 ,0x2b ,0xfe ,0xd7 ,0xab ,0x76},
@@ -40,6 +40,15 @@ std::string bytes_to_hexstr(char *data, int len) {
     s[2 * i + 1] = hexmap[data[i] & 0x0F];
   }
   return s;
+}
+
+void print_state(unsigned char state[4][4]) {
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            std::cout << std::hex << state[i][j] << " ";
+        }
+        std::cout << "\n";
+    }
 }
 
 void sub_bytes(unsigned char state[4][4]) {
@@ -171,10 +180,25 @@ char* encrypt(char* block, char* key) {
     add_round_key(state, w, 0);
 
     for (int round = 0; round < ROUNDS-1; ++round) {
+
+        print_state(state);
+
         sub_bytes(state);
+
+        print_state(state);
+
         shift_rows(state);
+
+        print_state(state);
+
         mix_columns(state);
+
+        print_state(state);
+
         add_round_key(state, w, 16 * (round+1));
+
+        print_state(state);
+
     }
 
     // last round
