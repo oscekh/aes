@@ -1,12 +1,12 @@
-// Most of this is based on the information in following report:
+// Most of this is based on the nist-standard specified in the following report:
 // https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197.pdf
 
 #include <vector>
 #include <iostream>
 #include <unistd.h>
 
-// 10 in AES-128
-const int ROUNDS = 1;
+const int ROUNDS = 10;
+const int KEY_SIZE = 16;
 
 int sbox[16][16] = {
      {0x63 ,0x7c ,0x77 ,0x7b ,0xf2 ,0x6b ,0x6f ,0xc5 ,0x30 ,0x01 ,0x67 ,0x2b ,0xfe ,0xd7 ,0xab ,0x76},
@@ -127,39 +127,39 @@ void sub_word(unsigned char arr[4]) {
     }
 }
 
-void key_expansion(char* key, unsigned char w[]) {
+void key_expansion2(char* key, unsigned char w[]) {
     unsigned char temp[4];
 
+    // copy user supplied key as first subkey
     int i = 0;
     while (i < 16) {
         w[i] = key[i];
         i++;
     }
 
-    i = 16;
+    int c = 16;
+    i = 1;
 
-    while (i < 16 * (ROUNDS+1)) {
-        temp[0] = w[i - 4];
-        temp[1] = w[i - 4 + 1];
-        temp[2] = w[i - 4 + 2];
-        temp[3] = w[i - 4 + 3];
-
-        if (i/4 % 4 == 0) {
-            rot_word(temp);
-            sub_word(temp);
-
-            temp[0] = temp[0] ^ rcon[i / 16];
-
-        } else if (i/4 % 4 == 4) {
-            sub_word(temp);
+    // while there are still bytes to be generated
+    while (c < 16 * (ROUNDS+1)) {
+        // copy temp variable from last 4-byte block
+        for (int a = 0; a < 4; ++a) {
+            temp[a] = w[a + c - 4];
         }
 
-        w[i]     = w[i - 16] ^ temp[0];
-        w[i + 1] = w[i - 15] ^ temp[1];
-        w[i + 2] = w[i - 14] ^ temp[2];
-        w[i + 3] = w[i - 13] ^ temp[3];
+        // every four blocks (of four bytes)
+        if (c % 16 == 0) {
+            rot_word(temp);
+            sub_word(temp);
+            temp[0] ^= rcon[i];
+            //temp[0] ^= rcon2(i);
+            i++;
+        }
 
-        i += 4;
+        for (int a = 0; a < 4; ++a) {
+            w[c] = w[c - 16] ^ temp[a];
+            c++;
+        }
     }
 }
 
@@ -167,7 +167,23 @@ char* encrypt(char* block, char* key) {
     unsigned char state[4][4];
 
     unsigned char w[16 * (ROUNDS+1)];
-    key_expansion(key, w);
+
+    // Set key to test value
+    for (int i = 0; i < 16; ++i)
+        key[i] = 0;
+
+    key_expansion2(key, w);
+    std::cout << "Printing keys:\n";
+    for (int i = 0; i < (ROUNDS+1); ++i) {
+        std::cout << i << ":\t";
+
+        for (int j = 0; j < 16; ++j) {
+            std::cout << hexmap[(w[16*i + j] & 0xF0) >> 4];
+            std::cout << hexmap[w[j] & 0x0F] << " ";
+        }
+
+        std::cout << "\n";
+    }
 
     // copy block into state matrix
     for (int i = 0; i < 4; ++i) {
@@ -180,25 +196,10 @@ char* encrypt(char* block, char* key) {
     add_round_key(state, w, 0);
 
     for (int round = 0; round < ROUNDS-1; ++round) {
-
-        print_state(state);
-
         sub_bytes(state);
-
-        print_state(state);
-
         shift_rows(state);
-
-        print_state(state);
-
         mix_columns(state);
-
-        print_state(state);
-
         add_round_key(state, w, 16 * (round+1));
-
-        print_state(state);
-
     }
 
     // last round
@@ -241,7 +242,7 @@ int main() {
         for (int j = 0; j < 16; ++j) {
             std::cout << encrypted[j];
         }
-        //std::cout << "\n";
+        std::cout << "\n";
 
         i++;
     }
