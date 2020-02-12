@@ -259,16 +259,22 @@ int main() {
     char key[16];
     std::cin.read(key, 16);
 
+    /*
     std::string hex_key = bytes_to_hexstr(key, 16);
-    //std::cout << "key:\t" << hex_key << "\n";
+    std::cout << "key:\t" << hex_key << "\n";
+    */
 
     int i = 0;
     while (!std::cin.eof()) {
         char block[16];
         std::cin.read(block, 16);
 
-        std::string hex_block = bytes_to_hexstr(block, 16);
+        //std::string hex_block = bytes_to_hexstr(block, 16);
+
         char* encrypted = encrypt(block, key);
+
+        if (std::cin.eof())
+            break;
 
         /*
         std::cout << "block" << i << ":\t";
@@ -280,9 +286,7 @@ int main() {
         for (int j = 0; j < 16; ++j) {
             std::cout << encrypted[j];
         }
-        //std::cout << "\n";
 
-        break;
         i++;
     }
 
