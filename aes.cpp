@@ -6,7 +6,6 @@
 #include <unistd.h>
 
 const int ROUNDS = 10;
-const int KEY_SIZE = 16;
 
 int sbox[16][16] = {
      {0x63 ,0x7c ,0x77 ,0x7b ,0xf2 ,0x6b ,0x6f ,0xc5 ,0x30 ,0x01 ,0x67 ,0x2b ,0xfe ,0xd7 ,0xab ,0x76},
@@ -166,28 +165,9 @@ void key_expansion2(char* key, unsigned char w[]) {
 
 char* encrypt(char* block, char* key) {
     unsigned char state[4][4];
-
     unsigned char w[16 * (ROUNDS+1)];
 
-    // Set key to test value
-    //for (int i = 0; i < 16; ++i)
-    //    key[i] = 0;
-
     key_expansion2(key, w);
-
-    /*
-    std::cout << "Printing keys:\n";
-    for (int i = 0; i < (ROUNDS+1); ++i) {
-        std::cout << i << ":\t";
-
-        for (int j = 0; j < 16; ++j) {
-            std::cout << hexmap[(w[16*i + j] & 0xF0) >> 4];
-            std::cout << hexmap[w[16*i + j] & 0x0F] << " ";
-        }
-
-        std::cout << "\n";
-    }
-    */
 
     // copy block into state matrix
     for (int i = 0; i < 4; ++i) {
@@ -199,42 +179,17 @@ char* encrypt(char* block, char* key) {
     // initial round key addition
     add_round_key(state, w, 0);
 
-    //print_state(state);
-
     for (int round = 0; round < ROUNDS-1; ++round) {
-        //std::cout << "\nSTARTING ROUND " << round << "\n";
-
-        //std::cout << "SUB BYTES:" << "\n";
         sub_bytes(state);
-        //print_state(state);
-
-        //std::cout << "SHIFT ROWS:" << "\n";
         shift_rows(state);
-        //print_state(state);
-
-        //std::cout << "MIX COLUMNS:" << "\n";
         mix_columns(state);
-        //print_state(state);
-
-        //std::cout << "ADD ROUND KEY:" << "\n";
         add_round_key(state, w, 16 * (round+1));
-        //print_state(state);
     }
 
     // last round
-    //std::cout << "\nSTARTING ROUND " << ROUNDS - 1 << "\n";
-
-    //std::cout << "SUB BYTES:" << "\n";
     sub_bytes(state);
-    //print_state(state);
-
-    //std::cout << "SHIFT ROWS:" << "\n";
     shift_rows(state);
-    //print_state(state);
-
-    //std::cout << "ADD ROUND KEY:" << "\n";
     add_round_key(state, w, 16 * ROUNDS);
-    //print_state(state);
 
     // copy output to block
     for (int i = 0; i < 4; ++i) {
@@ -242,15 +197,6 @@ char* encrypt(char* block, char* key) {
             block[i + 4*j] = state[i][j];
         }
     }
-
-    /*
-    std::cout << "Res:\n";
-    for (int i = 0; i < 16; ++i) {
-        std::cout << hexmap[(block[i] & 0xF0) >> 4];
-        std::cout << hexmap[block[i] & 0x0F] << " ";
-    }
-    std::cout << "\n";
-    */
 
     return block;
 }
@@ -269,16 +215,18 @@ int main() {
         char block[16];
         std::cin.read(block, 16);
 
-        //std::string hex_block = bytes_to_hexstr(block, 16);
-
-        char* encrypted = encrypt(block, key);
+        /*
+        std::string hex_block = bytes_to_hexstr(block, 16);
+        std::cout << "block" << i << ":\t";
+        std::cout << hex_block << " " << "\n";
+        */
 
         if (std::cin.eof())
             break;
 
+        char* encrypted = encrypt(block, key);
+
         /*
-        std::cout << "block" << i << ":\t";
-        std::cout << hex_block << " " << "\n";
         std::string hex_encrypted = bytes_to_hexstr(encrypted, 16);
         std::cout << "encr:\t" <<  hex_encrypted << " " << "\n";
         */
