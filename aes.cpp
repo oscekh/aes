@@ -201,41 +201,32 @@ char* encrypt(char* block, char* key) {
     return block;
 }
 
+void debug_print(std::string flag, char arr[], int size) {
+    std::string str = bytes_to_hexstr(arr, 16);
+    std::cout << flag << ":\t" << str << "\n";
+}
+
 int main() {
     char key[16];
     std::cin.read(key, 16);
 
-    /*
-    std::string hex_key = bytes_to_hexstr(key, 16);
-    std::cout << "key:\t" << hex_key << "\n";
-    */
+    //debug_print("key", key, 16);
 
-    int i = 0;
     while (!std::cin.eof()) {
         char block[16];
         std::cin.read(block, 16);
 
-        /*
-        std::string hex_block = bytes_to_hexstr(block, 16);
-        std::cout << "block" << i << ":\t";
-        std::cout << hex_block << " " << "\n";
-        */
+        //debug_print("block", block, 16);
 
         if (std::cin.eof())
             break;
 
         char* encrypted = encrypt(block, key);
-
-        /*
-        std::string hex_encrypted = bytes_to_hexstr(encrypted, 16);
-        std::cout << "encr:\t" <<  hex_encrypted << " " << "\n";
-        */
+        //debug_print("encr", encrypted, 16);
 
         for (int j = 0; j < 16; ++j) {
             std::cout << encrypted[j];
         }
-
-        i++;
     }
 
     return 0;
