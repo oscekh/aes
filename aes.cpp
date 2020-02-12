@@ -130,7 +130,7 @@ void sub_word(unsigned char arr[4]) {
 void key_expansion2(char* key, unsigned char w[]) {
     unsigned char temp[4];
 
-    // copy user supplied key as first subkey
+    // the original key is the first round key
     int i = 0;
     while (i < 16) {
         w[i] = key[i];
@@ -142,6 +142,7 @@ void key_expansion2(char* key, unsigned char w[]) {
 
     // while there are still bytes to be generated
     while (c < 16 * (ROUNDS+1)) {
+
         // copy temp variable from last 4-byte block
         for (int a = 0; a < 4; ++a) {
             temp[a] = w[a + c - 4];
@@ -151,8 +152,7 @@ void key_expansion2(char* key, unsigned char w[]) {
         if (c % 16 == 0) {
             rot_word(temp);
             sub_word(temp);
-            temp[0] ^= rcon[i];
-            //temp[0] ^= rcon2(i);
+            temp[0] ^= rcon[i-1];
             i++;
         }
 
@@ -173,13 +173,14 @@ char* encrypt(char* block, char* key) {
         key[i] = 0;
 
     key_expansion2(key, w);
+
     std::cout << "Printing keys:\n";
     for (int i = 0; i < (ROUNDS+1); ++i) {
         std::cout << i << ":\t";
 
         for (int j = 0; j < 16; ++j) {
             std::cout << hexmap[(w[16*i + j] & 0xF0) >> 4];
-            std::cout << hexmap[w[j] & 0x0F] << " ";
+            std::cout << hexmap[w[16*i + j] & 0x0F] << " ";
         }
 
         std::cout << "\n";
@@ -232,18 +233,19 @@ int main() {
         std::string hex_block = bytes_to_hexstr(block, 16);
         char* encrypted = encrypt(block, key);
 
-        /*
         std::cout << "block" << i << ":\t";
         std::cout << hex_block << " " << "\n";
         std::string hex_encrypted = bytes_to_hexstr(encrypted, 16);
         std::cout << "encr:\t" <<  hex_encrypted << " " << "\n";
-        */
 
+        /*
         for (int j = 0; j < 16; ++j) {
             std::cout << encrypted[j];
         }
         std::cout << "\n";
+        */
 
+        break;
         i++;
     }
 
